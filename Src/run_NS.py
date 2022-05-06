@@ -7,6 +7,8 @@ from Src.NS_parser import Parser
 from Src.config import Config
 from time import time
 import matplotlib.pyplot as plt
+from os import path
+from scipy import stats
 
 
 class Solver:
@@ -100,12 +102,75 @@ class Solver:
 
             plt.show()
 
+    def train_multiple(self):
+        # Learn the model on the environment
+        return_array = np.zeros((1,self.config.max_episodes))
+        true_rewards = []
+        action_prob = []
+        return_history = []
+
+        ckpt = self.config.save_after
+        rm_history, regret, rm, start_ep = [], 0, 0, 0
+        # if self.config.restore:
+        #     returns = list(np.load(self.config.paths['results']+"rewards.npy"))
+        #     rm = returns[-1]
+        #     start_ep = np.size(returns)
+        #     print(start_ep)
+
+        steps = 0
+        t0 = time()
+        for episode in range(start_ep, self.config.max_episodes):
+            # Reset both environment and model before a new episode
+
+            state = self.env.reset()
+            self.model.reset()
+
+            step, total_r = 0, 0
+            done = False
+            while not done:
+                # self.env.render(mode='human')
+                action, extra_info, dist = self.model.get_action(state)
+                new_state, reward, done, info = self.env.step(action=action)
+                self.model.update(state, action, extra_info, reward, new_state, done)
+                state = new_state
+
+                # Tracking intra-episode progress
+                total_r += reward
+                # regret += (reward - info['Max'])
+                step += 1
+                if step >= self.config.max_steps:
+                    break
+
+            # track inter-episode progress
+            # returns.append(total_r)
+            steps += step
+            # rm = 0.9*rm + 0.1*total_r
+            rm += total_r
+            return_array[0, episode] = total_r
+            if episode%ckpt == 0 or episode == self.config.max_episodes-1:
+                rm_history.append(rm)
+                return_history.append(total_r)
+                if self.config.debug and self.config.env_name == 'NS_Reco':
+                    action_prob.append(dist)
+                    true_rewards.append(self.env.get_rewards())
+
+                print("{} :: Rewards {:.3f} :: steps: {:.2f} :: Time: {:.3f}({:.5f}/step) :: Entropy : {:.3f} :: Grads : {}".
+                      format(episode, rm, steps/ckpt, (time() - t0)/ckpt, (time() - t0)/steps, self.model.entropy, self.model.get_grads()))
+
+                # self.model.save()
+                utils.save_plots(return_history, config=self.config, name='{}_rewards'.format(self.config.seed))
+
+                t0 = time()
+                steps = 0
+        return return_array
+
 
 # @profile
 def main(train=True, inc=-1, hyper='default', base=-1):
     t = time()
     args = Parser().get_parser().parse_args()
 
+    '''
     # Use only on-policy method for oracle
     if args.oracle >= 0:
             args.algo_name = 'ONPG'
@@ -122,7 +187,35 @@ def main(train=True, inc=-1, hyper='default', base=-1):
     if train:
         solver.train()
 
-    print("Total time taken: {}".format(time()-t))
+    print("Total time taken: {}".format(time() - t))
+
+    '''
+    n_trials = 30
+    returns_history = np.empty((n_trials, args.max_episodes))
+
+    for i in range(0, n_trials):
+        print("Begin trial ", i, ":")
+        args.seed = i
+        config = Config(args)
+        solver = Solver(config=config)
+        returns_history[i,:] = solver.train_multiple()
+
+    print(np.shape(returns_history))
+    # Compute mean
+    returns_mean = returns_history.mean(axis=0)
+    # Compute standard error of the mean
+    returns_sem = stats.sem(returns_history, axis=0)
+    trial_string = "{}_Trials_{}_Speed".format(n_trials, args.speed)
+
+    save_path = path.join(path.abspath(path.join(path.dirname(__file__), '..')), 'Experiments', 'my_tests', args.env_name, args.algo_name, trial_string+'/')
+    utils.create_directory_tree(save_path)
+
+    np.save(save_path+'/rewards_history', returns_history)
+    np.save(save_path+'rewards_mean', returns_mean)
+    np.save(save_path+'rewards_sem', returns_sem)
+
+
+
 
 if __name__ == "__main__":
         main(train=True)

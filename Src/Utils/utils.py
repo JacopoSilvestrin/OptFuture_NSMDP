@@ -222,7 +222,7 @@ def search(dir, name, exact=False):
 def dynamic_load(dir, name, load_class=False):
     try:
         abs_path = search(dir, name).split('/')[1:]
-        pos = abs_path.index('OptFuture')
+        pos = abs_path.index('OptFuture_NSMDP')
         module_path = '.'.join([str(item) for item in abs_path[pos + 1:]])
         print("Module path: ", module_path, name)
         if load_class:
