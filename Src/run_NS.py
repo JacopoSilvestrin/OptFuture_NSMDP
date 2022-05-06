@@ -190,7 +190,7 @@ def main(train=True, inc=-1, hyper='default', base=-1):
     print("Total time taken: {}".format(time() - t))
 
     '''
-    n_trials = 30
+    n_trials = 10
     returns_history = np.empty((n_trials, args.max_episodes))
 
     for i in range(0, n_trials):
