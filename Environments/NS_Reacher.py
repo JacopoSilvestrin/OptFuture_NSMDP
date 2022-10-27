@@ -4,6 +4,7 @@ import matplotlib.pyplot  as plt
 from matplotlib.patches import Rectangle, Circle, Arrow
 from matplotlib.ticker import NullLocator
 from Src.Utils.utils import Space
+import seaborn as sns
 
 
 class NS_Reacher(object):
@@ -13,7 +14,7 @@ class NS_Reacher(object):
                  oracle=-1,
                  speed=4,
                  debug=True,
-                 max_step_length=0.15,
+                 max_step_length=0.1,
                  max_steps=2):
 
         n_actions = 4
@@ -34,13 +35,13 @@ class NS_Reacher(object):
 
         self.wall_width = 0.05
         self.step_unit = self.wall_width - 0.005
-        self.repeat = int(max_step_length / self.step_unit)
+        self.repeat = int(max_step_length / self.step_unit) #this might make the step too big
 
-        self.max_horizon = int(max_steps / max_step_length)
+        self.max_horizon = int(max_steps / max_step_length) # if I reduce the step length I have to increase this
         self.step_reward = -0.5
         self.collision_reward = 0  # -0.05
         self.movement_reward = 0  # 1
-        self.randomness = 0.25
+        self.randomness = 0
 
         # No lidars used
         self.n_lidar = 0
@@ -48,9 +49,8 @@ class NS_Reacher(object):
         self.lidar_angles = list(zip(np.cos(self.angles), np.sin(self.angles)))
         self.static_obstacles = self.get_static_obstacles()
 
-        if debug:
-            self.heatmap_scale = 99
-            self.heatmap = np.zeros((self.heatmap_scale + 1, self.heatmap_scale + 1))
+        self.heatmap_scale = 99
+        self.heatmap = np.zeros((self.heatmap_scale + 1, self.heatmap_scale + 1))
 
         self.reset()
 
@@ -114,7 +114,7 @@ class NS_Reacher(object):
 
     def set_rewards(self):
         # All rewards
-        self.G1_reward = 100 #100
+        self.G1_reward = 30 #100
 
     def reset(self):
         """
@@ -130,6 +130,8 @@ class NS_Reacher(object):
 
         #x = 0.25
         #x = np.clip(x + np.random.randn()/30, 0.15, 0.35) # Add noise to initial x position
+        #x = np.random.randint(1,10)/10
+        #y = np.random.randint(1,6)/10
         self.curr_pos = np.array([0.5, 0.5])
         self.curr_state = self.make_state()
 
@@ -158,14 +160,14 @@ class NS_Reacher(object):
 
         # Check if previous state was end of MDP, if it was, then we are in absorbing state currently.
         # Terminal state has a Self-loop and a 0 reward
-        term = self.is_terminal()
+        term = self.is_terminal() # if in area of target or if reached max steps
         if term:
             return self.curr_state, 0, term, {'No INFO implemented yet'}
 
         motion = self.motions[action]  # Table look up for the impact/effect of the selected action
         reward += self.step_reward
 
-        for i in range(self.repeat):
+        for i in range(self.repeat):  # repeat = 3
             if np.random.rand() < self.randomness:
                 # Add noise some percentage of the time
                 noise = np.random.rand(2)/1.415  # normalize by max L2 of noise
@@ -182,7 +184,7 @@ class NS_Reacher(object):
                     print("ERROR: Step size bigger than wall width", new_pos, self.curr_pos, dist, delta, motion, self.step_unit)
 
                 self.curr_pos = new_pos
-                reward += self.get_goal_rewards(self.curr_pos)
+                reward += self.get_goal_rewards(self.curr_pos)  #check if the current pos is in G1 region
                 # reward += self.open_gate_condition(self.curr_pos)
             else:
                 reward += self.collision_reward
@@ -190,15 +192,16 @@ class NS_Reacher(object):
 
             # To avoid overshooting the goal
             if self.is_terminal():
+                self.curr_state = self.make_state()
                 break
 
             # self.update_state()
             self.curr_state = self.make_state()
 
-        if self.debug:
-            # Track the positions being explored by the agent
-            x_h, y_h = self.curr_pos*self.heatmap_scale
-            self.heatmap[min(int(y_h), 99), min(int(x_h), 99)] += 1
+
+        # Track the positions being explored by the agent
+        x_h, y_h = self.curr_pos*self.heatmap_scale
+        self.heatmap[min(int(y_h), 99), min(int(x_h), 99)] += 1
 
             ## For visualizing obstacle crossing flaw, if any
             # for alpha in np.linspace(0,1,10):
@@ -228,11 +231,11 @@ class NS_Reacher(object):
         return state
 
     def get_goal_rewards(self, pos):
-        for key, val in self.reward_states.items():
-            region, reward = val
+        for key, val in self.reward_states.items():  # here there is only one goal, G1
+            region, reward = val  # takes region of G1 and reward of 100
             if reward and self.in_region(pos, region):
-                self.reward_states[key] = (region, 0)  # remove reward once taken
-                if self.debug: print("Got reward {} in {} steps!! ".format(reward, self.steps_taken))
+                self.reward_states[key] = (region, 0)  # remove reward once taken (and starts new episodes from initial position) useful because does 3 steps
+                print("Got reward {} in {} steps!! ".format(reward, self.steps_taken))
 
                 return reward
         return 0
@@ -245,7 +248,7 @@ class NS_Reacher(object):
             x = (0.9 * np.sin(self.episode * self.frequency) + 1) / 2.0
             y = (0.9 * np.cos(self.episode * self.frequency) + 1) / 2.0
 
-        self.G1 = (x - 0.025, y - 0.025, x + 0.025, y + 0.025)
+        self.G1 = (x - 0.05, y - 0.05, x + 0.05, y + 0.05)
         return {'G1': (self.G1, self.G1_reward)}
 
     def get_dynamic_obstacles(self):

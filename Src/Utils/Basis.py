@@ -103,15 +103,18 @@ class NN_Basis(Basis):
         dims = [self.state_dim]
         dims.extend(self.config.feature_dim)
         dims = zip(dims[:-1], dims[1:])
+        print(dims)
         for dim1, dim2 in dims:
             layers.append(torch.nn.Linear(dim1, dim2))
             layers.append(torch.nn.Tanh())
-            # layers.append(torch.nn.ReLU6())
+            #layers.append(torch.nn.ReLU6())
 
         self.net = torch.nn.Sequential(*layers)
         self.init()
 
     def forward(self, state):
+        layers = [x.data for x in self.net.parameters()]
+        #print(layers)
         return self.net(state)
 
 

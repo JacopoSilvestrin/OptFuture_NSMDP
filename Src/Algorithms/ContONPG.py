@@ -8,13 +8,14 @@ from Src.Algorithms import NS_utils
 """
 
 """
-class ONPG(Agent):
+class ContONPG(Agent):
     def __init__(self, config):
-        super(ONPG, self).__init__(config)
+        super(ContONPG, self).__init__(config)
         # Get state features and instances for Actor and Value function
         self.state_features = Basis.get_Basis(config=config)
         self.actor, self.atype, self.action_size = NS_utils.get_Policy(state_dim=self.state_features.feature_dim,
                                                                        config=config)
+
         self.memory = utils.TrajectoryBuffer(buffer_size=config.buffer_size, state_dim=self.state_dim,
                                              action_dim=self.action_size, atype=self.atype, config=config, dist_dim=1)
 
@@ -23,7 +24,7 @@ class ONPG(Agent):
         self.init()
 
     def reset(self):
-        super(ONPG, self).reset()
+        super(ContONPG, self).reset()
         self.memory.next()
         self.counter += 1
         self.gamma_t = 1
@@ -43,7 +44,7 @@ class ONPG(Agent):
         # Batch episode history
         self.memory.add(s1, a1, prob, self.gamma_t * r1)
         self.gamma_t *= self.config.gamma
-
+        # Do the update
         if done and self.counter % self.config.delta == 0:
             self.optimize()
             self.memory.reset()         # Throw away all the past data after optimization is done
@@ -88,7 +89,8 @@ class ONPG(Agent):
 
 
             # Compute the final loss
-            loss += - 1.0 * torch.mean(log_pi_return)                               # mean(Bx1) -> 1
+            #loss += - 1.0 * torch.mean(torch.sum(returns, dim=1))                               # mean(Bx1) -> 1
+            loss += - 1.0 * torch.mean(log_pi_return)
 
             # Discourage very deterministic policies.
             if self.config.entropy_lambda > 0:
@@ -103,5 +105,5 @@ class ONPG(Agent):
 
             # Compute the total derivative and update the parameters.
             self.step(loss)
-            #self.actor.generateAndTest()
+            self.actor.generateAndTest()
 

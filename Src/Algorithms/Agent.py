@@ -55,7 +55,7 @@ class Agent:
         except ValueError as error:
             print("Loading failed: ", error)
 
-    def step(self, loss, clip_norm=False):
+    def step(self, loss, clip_norm=False):  # This makes ProWLS better and ONPG worse
         self.clear_gradients()
         loss.backward()
         for _, module in self.modules:

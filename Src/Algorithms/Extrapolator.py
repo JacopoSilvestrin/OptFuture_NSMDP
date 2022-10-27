@@ -62,7 +62,7 @@ class WLS:
 
 
         # TODO: might want to add a small noise to avoid inversion of singular matrix
-        diag = torch.diag(weights.view(-1))                             # BxB
+        diag = torch.diag(weights.view(-1))      # BxB
 
         phi_xt = phi_x.transpose(1, 0)                                  # kxB
         inv = torch.inverse(phi_xt.mm(diag).mm(phi_x))                  # (kxB x BxB x Bxk)^{-1} -> kxk

@@ -62,6 +62,7 @@ class Config(object):
         sys.stdout = utils.Logger(self.paths['logs'], args.restore, args.log_output)
 
         # Get the domain and algorithm
+        self.env_name = args.env_name
         self.env, self.gym_env, self.cont_actions = self.get_domain(args.env_name, args=args, debug=args.debug,
                                                                path=path.join(self.paths['root'], 'Environments'))
         try:
@@ -70,6 +71,7 @@ class Config(object):
             self.env.seed(seed)
 
         # Set Model
+        self.algo_name = args.algo_name
         self.algo = utils.dynamic_load(path.join(self.paths['root'], 'Src', 'Algorithms'), args.algo_name, load_class=True)
 
         self.feature_dim = [int(size) for size in args.NN_basis_dim.split(',')]
@@ -94,7 +96,7 @@ class Config(object):
 
     def get_domain(self, tag, args, path, debug=True):
 
-        if tag == 'NS_Reco' or tag == 'NS_Reacher':
+        if tag == 'NS_Reco' or tag == 'NS_Reacher' or tag == 'NS_Wind' or tag == 'NS_Target':
             obj = utils.dynamic_load(path, tag, load_class=True)
             env = obj(speed=args.speed, oracle=args.oracle, debug=debug)
             return env, False, env.action_space.dtype == np.float32

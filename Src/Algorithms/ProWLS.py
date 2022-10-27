@@ -22,6 +22,7 @@ class ProWLS(Agent):
 
         self.modules = [('actor', self.actor), ('state_features', self.state_features)]
         self.counter = 0
+        self.prediction = 0
         self.init()
 
     def reset(self):
@@ -32,7 +33,9 @@ class ProWLS(Agent):
 
     def get_action(self, state):
         state = tensor(state, dtype=float32, requires_grad=False, device=self.config.device)
+        #print(state.view(1,-1))
         state = self.state_features.forward(state.view(1, -1))
+        #print(state)
         action, prob, dist = self.actor.get_action_w_prob_dist(state)
 
         # if self.config.debug:
@@ -42,11 +45,20 @@ class ProWLS(Agent):
 
     def update(self, s1, a1, prob, r1, s2, done):
         # Batch episode history
+        '''print("Start update")
+        print(s1)
+        print(a1)
+        print(prob)
+        print(r1)
+        print(done)'''
         self.memory.add(s1, a1, prob, self.gamma_t * r1)
         self.gamma_t *= self.config.gamma
+        #print("Counter: {}".format(self.counter))
+        #print("Delta: {}".format(self.config.delta))
 
         if done and self.counter % self.config.delta == 0:
             try:
+                #print("Call Optimize")
                 self.optimize()
             except RuntimeError as error:
                 print('Runtime Error: ', error)
@@ -67,8 +79,10 @@ class ProWLS(Agent):
             B, H, D = s.shape
             _, _, A = a.shape
 
+            #print(">Here I'm in optimize")
             # create state features
             s_feature = self.state_features.forward(s.view(B*H, D))             # BxHxD -> (BxH)xd
+
 
             # Get action probabilities
             log_pi, dist_all = self.actor.get_logprob_dist(s_feature, a.view(B * H, -1))     # (BxH)xd, (BxH)xA
@@ -83,7 +97,7 @@ class ProWLS(Agent):
 
             rho = rho_num / rho_denom
             rho = torch.clamp(rho, 0, self.config.importance_clip)            # Clipped Importance sampling (Biased)
-
+            #print("Rho: {}".format(rho))
             # Create total return
             total_return = torch.sum(r, dim=-1, keepdim=True)                   # sum(BxH) -> Bx1
 
@@ -93,6 +107,8 @@ class ProWLS(Agent):
 
             # Compute the final loss
             loss = - 1.0 * forecast
+
+            #print("Loss before entropy: {}".format(loss))
 
             # Discourage very deterministic policies.
             if self.config.entropy_lambda > 0:
@@ -105,7 +121,30 @@ class ProWLS(Agent):
 
                 loss = loss + self.config.entropy_lambda * entropy
 
+            #print("Loss: {}".format(loss))
             # Compute the total derivative and update the parameters.
             self.step(loss)
 
+            # in the last iteration get the actual prediction
+            if iter == self.config.max_inner - 1:
+                # Get action probabilities
+                log_pi, dist_all = self.actor.get_logprob_dist(s_feature, a.view(B * H, -1))  # (BxH)xd, (BxH)xA
+                log_pi = log_pi.view(B, H)  # (BxH)x1 -> BxH
 
+                log_pi[mask == 0] = 0  # For summing in log, equate these to zero
+                rho_num = torch.exp(torch.sum(log_pi, dim=-1, keepdim=True))
+
+                beta[mask == 0] = 1  # For taking raw product, equate these to 1
+                rho_denom = torch.prod(beta, dim=-1, keepdim=True)
+
+                rho = rho_num / rho_denom
+                rho = torch.clamp(rho, 0, self.config.importance_clip)  # Clipped Importance sampling (Biased)
+
+                # Create total return
+                total_return = torch.sum(r, dim=-1, keepdim=True)  # sum(BxH) -> Bx1
+
+                # Note: forecasting for the mean performance of the next batch when learning actively
+                forecast = self.extrapolator.forward(x=id, y=total_return, weights=rho, max_len=self.memory.size,
+                                                     delta=self.config.delta)
+
+                self.prediction = forecast.item()
