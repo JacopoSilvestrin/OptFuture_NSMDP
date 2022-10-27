@@ -1,6 +1,5 @@
 from multiprocessing import Pool as ThreadPool
-from subprocess import call
-from Src.run_NS import main as myfunction
+from run_NS import main as myfunction
 import argparse
 
 
