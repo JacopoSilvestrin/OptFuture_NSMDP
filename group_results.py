@@ -14,7 +14,7 @@ for i in range(30):
     #v_prowls = np.vstack((v_prowls, vec))
     v_1 = np.vstack((v_1, vec))
 
-    vec = np.load("disc_return_history_alg_ONPG_speed_1_seed_{}.npy".format(i))
+    vec = np.load("episode_length_alg_ONPG_speed_1_seed_{}.npy".format(i))
     #vec = np.load("disc_return_history_alg_ONPG_speed_0_seed_{}.npy".format(i))
     #v_baseline = np.vstack((v_baseline, vec))
     v_2 = np.vstack((v_2, vec))

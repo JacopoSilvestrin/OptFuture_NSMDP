@@ -53,8 +53,8 @@ class Parser(object):
 
     def Env_n_Agent_args(self, parser):
         # parser.add_argument("--algo_name", default='OFPG', help="Learning algorithm")
-        parser.add_argument("--algo_name", default='ONPG', help="Learning algorithm")
-        #parser.add_argument("--algo_name", default='ContONPG', help="Learning algorithm")
+        #parser.add_argument("--algo_name", default='ONPG', help="Learning algorithm")
+        parser.add_argument("--algo_name", default='ContONPG', help="Learning algorithm")
         #parser.add_argument("--algo_name", default='ProOLS', help="Learning algorithm")
         #parser.add_argument("--algo_name", default='ProWLS', help="Learning algorithm")
         # parser.add_argument("--env_name", default='NS_SimGlucose-v0', help="Environment to run the code")
